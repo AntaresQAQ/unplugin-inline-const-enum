@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`E2E - Inline Const Enum Plugin > should process files with the plugin 1`] = `
+exports[`E2E - Inline Const Enum Plugin > should inline const enums correctly 1`] = `
 {
   "output": [
     {

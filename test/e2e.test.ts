@@ -16,7 +16,6 @@ describe("E2E - Inline Const Enum Plugin", () => {
                     sourceDir,
                     sourcePattern: "**/*.ts",
                     tsConfig,
-                    debug: true,
                 }),
             ],
             build: {
@@ -37,7 +36,7 @@ describe("E2E - Inline Const Enum Plugin", () => {
         return result[0];
     }
 
-    it("should process files with the plugin", async () => {
+    it("should inline const enums correctly", async () => {
         const entry = path.resolve(fixturesDir, "app.ts");
         const result = await buildWithPluginAsync(entry, fixturesDir, tsConfigPath);
 
