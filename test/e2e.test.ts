@@ -25,21 +25,23 @@ describe("E2E - Inline Const Enum Plugin", () => {
                     fileName: "output",
                 },
                 write: false,
-                minify: true,
+                minify: false,
             },
         };
 
         const result = await build(config);
-        if (!Array.isArray(result)) {
-            return result;
+        if (Array.isArray(result)) {
+            return result[0];
         }
-        return result[0];
+
+        return { ...result, output: [] };
     }
 
     it("should inline const enums correctly", async () => {
         const entry = path.resolve(fixturesDir, "app.ts");
         const result = await buildWithPluginAsync(entry, fixturesDir, tsConfigPath);
-
-        expect(result).matchSnapshot();
+        expect(result).toBeDefined();
+        expect(result.output).toHaveLength(1);
+        expect(result.output[0].code).toMatchSnapshot();
     });
 });
