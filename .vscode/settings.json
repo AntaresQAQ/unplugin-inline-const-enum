@@ -1,0 +1,25 @@
+{
+  "git.ignoreLimitWarning": true,
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.detectIndentation": true,
+  "[typescript]": {
+    "editor.formatOnSave": false,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.removeUnusedImports": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.formatOnSave": false,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.removeUnusedImports": "explicit"
+    }
+  },
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "typescript.suggest.autoImports": true,
+  "npm.packageManager": "yarn"
+}

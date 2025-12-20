@@ -1,0 +1,1 @@
+# uplugin-inline-const-enum
