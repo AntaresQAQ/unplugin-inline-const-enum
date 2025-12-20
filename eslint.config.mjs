@@ -6,8 +6,8 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 const IGNORED_FILES = ["node_modules/**", "dist/**", ".yarn/*", ".pnp.*", ".github/*"];
-const TS_FILES = ["src/**/*.{ts,cts,mts}"];
-const JS_FILES = ["src/**/*.{js,cjs,mjs}", "eslint.config.mjs"];
+const TS_FILES = ["{src,test}/**/*.{ts,cts,mts}"];
+const JS_FILES = ["{src,test}/**/*.{js,cjs,mjs}", "eslint.config.mjs"];
 
 export default defineConfig(
     js.configs.recommended,
