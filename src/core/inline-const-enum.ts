@@ -322,10 +322,7 @@ export class InlineConstEnum {
     private resolveImportedModuleSpecifier(sourceValue: string, moduleSpecifier: IModuleSpecifier): IModuleSpecifier {
         // Remove ts extensions
         if (isTs(getLang(sourceValue))) {
-            sourceValue = path.resolve(
-                path.dirname(sourceValue),
-                path.basename(sourceValue, path.extname(sourceValue)),
-            );
+            sourceValue = path.join(path.dirname(sourceValue), path.basename(sourceValue, path.extname(sourceValue)));
         }
         if (sourceValue.startsWith(".")) {
             // relative path
