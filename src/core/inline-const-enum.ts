@@ -26,16 +26,19 @@ import type {
     IResolvedInlineConstEnumOptions,
     ITsModule,
 } from "./types";
+import { printLog } from "./utils";
 
 export class InlineConstEnum {
     private tsConfigMatchPath: tsConfigPaths.MatchPath;
 
     private tsModules: ITsModule[] = [];
-    private enumCollection = new EnumCollection();
-    private enumDeclarationPendingTask = new Map<string, () => void>();
-    private mayBeConstEnumImportSpecifiers = new Set<string>();
+    private readonly enumCollection: EnumCollection;
+    private readonly enumDeclarationPendingTask = new Map<string, () => void>();
+    private readonly mayBeConstEnumImportSpecifiers = new Set<string>();
 
     constructor(private readonly options: IResolvedInlineConstEnumOptions) {
+        this.enumCollection = new EnumCollection(options);
+
         const result = tsConfigPaths.loadConfig(options.tsConfig);
         if (result.resultType === "failed") {
             throw new Error(result.message);
@@ -44,9 +47,10 @@ export class InlineConstEnum {
         this.tsConfigMatchPath = tsConfigPaths.createMatchPath(result.absoluteBaseUrl, result.paths);
     }
 
-    public replaceConstEnumValues(code: string, moduleSpecifier: IModuleSpecifier): string {
+    public replaceConstEnumValues(code: string, id: string): string {
         const strCode = new MagicString(code);
-        const ast = babelParse(code);
+        const ast = babelParse(code, getLang(id));
+        const moduleSpecifier = path.resolve(path.dirname(id), path.basename(id, path.extname(id)));
         traverseFast(ast, (node) => {
             if (
                 node.type === "MemberExpression" &&
@@ -56,6 +60,12 @@ export class InlineConstEnum {
                 const enumName = node.object.name;
                 const memberName = node.property.name;
                 const enumValue = this.enumCollection.getEnumValues(moduleSpecifier, enumName, memberName);
+
+                if (this.options.debug) {
+                    printLog(
+                        `Inlining const enum value: ${enumName}.${memberName} => ${JSON.stringify(enumValue)} in module ${moduleSpecifier}`,
+                    );
+                }
 
                 if (enumValue !== null) {
                     strCode.overwrite(node.start!, node.end!, JSON.stringify(enumValue));
@@ -89,19 +99,26 @@ export class InlineConstEnum {
                     };
                 }),
         );
+
+        if (this.options.debug) {
+            printLog(`Loaded TS modules:\n${this.tsModules.map((m) => `- ${m.moduleSpecifier}`).join("\n")}`);
+        }
     }
 
     public scanConstEnums(): void {
         for (
-            let prevMayBeConstEnumImportSpecifiersCount = this.mayBeConstEnumImportSpecifiers.size;
+            let prevMayBeConstEnumImportSpecifiersCount = -1;
             this.enumDeclarationPendingTask.size != 0 ||
             this.mayBeConstEnumImportSpecifiers.size != prevMayBeConstEnumImportSpecifiersCount;
-            prevMayBeConstEnumImportSpecifiersCount = this.mayBeConstEnumImportSpecifiers.size
         ) {
+            prevMayBeConstEnumImportSpecifiersCount = this.mayBeConstEnumImportSpecifiers.size;
             this.buildConstEnumDeclarations();
             for (const task of this.enumDeclarationPendingTask.values()) {
                 task();
             }
+        }
+        if (this.options.debug) {
+            this.enumCollection.printMapping();
         }
     }
 
@@ -290,6 +307,9 @@ export class InlineConstEnum {
                 // The current item have not been initialized, use the index as the value
                 value = itemIndex;
             }
+
+            enumDeclaration.definition.set(memberName, value);
+
             itemIndex++;
         }
 
