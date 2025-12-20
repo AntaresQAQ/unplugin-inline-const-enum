@@ -26,7 +26,7 @@ import type {
     IResolvedInlineConstEnumOptions,
     ITsModule,
 } from "./types";
-import { printLog } from "./utils";
+import { isValidConstEnumMemberValue, printLog } from "./utils";
 
 export class InlineConstEnum {
     private tsConfigMatchPath: tsConfigPaths.MatchPath;
@@ -61,13 +61,12 @@ export class InlineConstEnum {
                 const memberName = node.property.name;
                 const enumValue = this.enumCollection.getEnumValues(moduleSpecifier, enumName, memberName);
 
-                if (this.options.debug) {
-                    printLog(
-                        `Inlining const enum value: ${enumName}.${memberName} => ${JSON.stringify(enumValue)} in module ${moduleSpecifier}`,
-                    );
-                }
-
-                if (enumValue !== null) {
+                if (isValidConstEnumMemberValue(enumValue)) {
+                    if (this.options.debug) {
+                        printLog(
+                            `Inlining const enum value: ${enumName}.${memberName} => ${JSON.stringify(enumValue)} in module ${moduleSpecifier}`,
+                        );
+                    }
                     strCode.overwrite(node.start!, node.end!, JSON.stringify(enumValue));
                 }
             }
@@ -292,8 +291,15 @@ export class InlineConstEnum {
                     return;
                 }
 
+                if (!isValidConstEnumMemberValue(value)) {
+                    throw new TypeError(
+                        `Const enum member "${enumName}.${memberName}" in module ${moduleSpecifier} has unsupported type.`,
+                    );
+                }
+
                 if (typeof value === "number") {
                     itemIndex = value;
+                    prevNonNumberItemInitialized = false;
                 } else {
                     prevNonNumberItemInitialized = true;
                 }
@@ -409,7 +415,7 @@ export class InlineConstEnum {
                 // Return undefined if the enum member value is not found in the current enum definition
                 const value = definition.get(node.property.name);
 
-                if (!value) {
+                if (value === undefined) {
                     throw new TypeError(
                         `Const enum member "${enumName}.${memberName}" in module ${moduleSpecifier} has unsupported type.`,
                     );
@@ -420,6 +426,18 @@ export class InlineConstEnum {
                 // Return null if the enum member value is not found
                 return this.enumCollection.getEnumValues(moduleSpecifier, node.object.name, node.property.name);
             }
+        } else if (node.type === "Identifier") {
+            // SomeMember
+            // Check if the enum member is in the current definition
+            const value = definition.get(node.name);
+
+            if (value === undefined) {
+                throw new TypeError(
+                    `Const enum member "${enumName}.${memberName}" in module ${moduleSpecifier} has unsupported type.`,
+                );
+            }
+
+            return value;
         } else {
             throw new TypeError(
                 `Const enum member "${enumName}.${memberName}" in module ${moduleSpecifier} has unsupported type.`,
