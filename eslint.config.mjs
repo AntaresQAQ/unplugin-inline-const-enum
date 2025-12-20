@@ -66,7 +66,7 @@ export default defineConfig(
             "@typescript-eslint/naming-convention": [
                 "error",
                 {
-                    selector: "interface",
+                    selector: ["interface", "typeAlias"],
                     format: ["PascalCase"],
                     prefix: ["I"],
                 },
