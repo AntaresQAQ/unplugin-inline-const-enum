@@ -107,10 +107,10 @@ export class InlineConstEnum {
     }
 
     public scanConstEnums(): void {
-        for (
-            let prevMayBeConstEnumImportSpecifiersCount = -1;
+        let prevMayBeConstEnumImportSpecifiersCount = -1;
+        while (
             this.enumDeclarationPendingTask.size != 0 ||
-            this.mayBeConstEnumImportSpecifiers.size != prevMayBeConstEnumImportSpecifiersCount;
+            this.mayBeConstEnumImportSpecifiers.size != prevMayBeConstEnumImportSpecifiersCount
         ) {
             prevMayBeConstEnumImportSpecifiersCount = this.mayBeConstEnumImportSpecifiers.size;
             this.buildConstEnumDeclarations();
