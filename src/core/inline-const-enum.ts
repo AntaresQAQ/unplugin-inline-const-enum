@@ -1,6 +1,8 @@
 import {
     type BinaryExpression,
+    type ExportSpecifier,
     type Expression,
+    type Identifier,
     type ImportDefaultSpecifier,
     type ImportSpecifier,
     type PrivateName,
@@ -133,106 +135,36 @@ export class InlineConstEnum {
                     if (node.declaration && node.declaration.type === "TSEnumDeclaration" && node.declaration.const) {
                         // export const enum CE_XXX { ... }
                         this.buildConstEnumCommonDeclaration(node.declaration, moduleSpecifier);
-                        this.enumCollection.setExportedEnum(moduleSpecifier, node.declaration.id.name);
+                        this.buildConstEnumExportedDeclaration(node.declaration, moduleSpecifier);
+                        continue;
                     }
 
                     if (!node.declaration) {
                         // export { ... }
                         // export { ... } from ...
-
-                        if (node.source) {
-                            // export { CE_XXX } from ...
-                            // export { ... as CE_XXX } from ...
-                            // export { default as CE_XXX } from ...
-                            const importedModuleSpecifier = this.resolveImportedModuleSpecifier(
-                                node.source.value,
-                                moduleSpecifier,
-                            );
-
-                            for (const specifier of node.specifiers) {
-                                if (specifier.type === "ExportSpecifier" && specifier.exportKind === "value") {
-                                    const enumName =
-                                        specifier.exported.type === "Identifier"
-                                            ? specifier.exported.name
-                                            : specifier.exported.value;
-
-                                    if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, enumName)) {
-                                        continue;
-                                    }
-                                    const importedEnumName = specifier.local.name;
-
-                                    const taskKey = this.getEnumTaskKey(moduleSpecifier, enumName);
-                                    if (
-                                        this.enumCollection.hasEnumDeclaration(
-                                            importedModuleSpecifier,
-                                            importedEnumName,
-                                        )
-                                    ) {
-                                        this.mayBeConstEnumImportSpecifiers.delete(taskKey);
-
-                                        const enumDeclaration: IConstEnumImportedDeclaration = {
-                                            from: importedModuleSpecifier,
-                                            name: importedEnumName,
-                                        };
-
-                                        this.enumCollection.setEnumDeclaration(
-                                            moduleSpecifier,
-                                            importedEnumName,
-                                            enumDeclaration,
-                                        );
-                                        this.enumCollection.setExportedEnum(
-                                            moduleSpecifier,
-                                            importedEnumName,
-                                            enumName,
-                                        );
-                                    } else {
-                                        this.mayBeConstEnumImportSpecifiers.add(taskKey);
-                                    }
+                        for (const specifier of node.specifiers) {
+                            if (specifier.type === "ExportSpecifier" && specifier.exportKind === "value") {
+                                if (node.source) {
+                                    // export { CE_XXX } from ...
+                                    // export { ... as CE_XXX } from ...
+                                    // export { default as CE_XXX } from ...
+                                    const importedModuleSpecifier = this.resolveImportedModuleSpecifier(
+                                        node.source.value,
+                                        moduleSpecifier,
+                                    );
+                                    this.buildConstEnumImportedDeclaration(
+                                        specifier,
+                                        moduleSpecifier,
+                                        importedModuleSpecifier,
+                                    );
                                 }
-                            }
-                        } else {
-                            // export { CE_XXX }
-                            // export { ... as CE_XXX }
-
-                            for (const specifier of node.specifiers) {
-                                if (specifier.type === "ExportSpecifier" && specifier.exportKind === "value") {
-                                    const enumName =
-                                        specifier.exported.type === "Identifier"
-                                            ? specifier.exported.name
-                                            : specifier.exported.value;
-
-                                    if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, enumName)) {
-                                        continue;
-                                    }
-
-                                    const localEnumName = specifier.local.name;
-
-                                    const taskKey = this.getEnumTaskKey(moduleSpecifier, localEnumName);
-                                    if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, localEnumName)) {
-                                        this.enumCollection.setExportedEnum(moduleSpecifier, localEnumName, enumName);
-                                        this.mayBeConstEnumImportSpecifiers.delete(taskKey);
-                                    } else {
-                                        this.mayBeConstEnumImportSpecifiers.add(taskKey);
-                                    }
-                                }
+                                this.buildConstEnumExportedDeclaration(specifier, moduleSpecifier);
                             }
                         }
                     }
-                } else if (node.type === "ExportDefaultDeclaration") {
-                    // export default ...
-
-                    if (node.declaration.type === "Identifier") {
-                        // export default XXX
-                        const enumName = node.declaration.name;
-                        const taskKey = this.getEnumTaskKey(moduleSpecifier, enumName);
-                        if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, enumName)) {
-                            // exported default CE_XXX
-                            this.enumCollection.setExportedEnum(moduleSpecifier, enumName, "default");
-                            this.mayBeConstEnumImportSpecifiers.delete(taskKey);
-                        } else {
-                            this.mayBeConstEnumImportSpecifiers.add(taskKey);
-                        }
-                    }
+                } else if (node.type === "ExportDefaultDeclaration" && node.declaration.type === "Identifier") {
+                    // export default XXX
+                    this.buildConstEnumExportedDeclaration(node.declaration, moduleSpecifier);
                 } else if (node.type === "ImportDeclaration" && node.importKind === "value") {
                     // import ... from ...
                     const importedModuleSpecifier = this.resolveImportedModuleSpecifier(
@@ -324,7 +256,7 @@ export class InlineConstEnum {
     }
 
     private buildConstEnumImportedDeclaration(
-        node: ImportSpecifier | ImportDefaultSpecifier,
+        node: ImportSpecifier | ImportDefaultSpecifier | ExportSpecifier,
         moduleSpecifier: IModuleSpecifier,
         importedModuleSpecifier: IModuleSpecifier,
     ): void {
@@ -335,11 +267,13 @@ export class InlineConstEnum {
         }
 
         const importedEnumName: IConstEnumName =
-            node.type === "ImportDefaultSpecifier"
-                ? "default"
-                : node.imported.type === "Identifier"
-                  ? node.imported.name
-                  : node.imported.value;
+            node.type === "ExportSpecifier"
+                ? node.local.name
+                : node.type === "ImportDefaultSpecifier"
+                  ? "default"
+                  : node.imported.type === "Identifier"
+                    ? node.imported.name
+                    : node.imported.value;
 
         const taskKey = this.getEnumTaskKey(moduleSpecifier, enumName);
         if (this.enumCollection.hasEnumDeclaration(importedModuleSpecifier, importedEnumName)) {
@@ -356,13 +290,42 @@ export class InlineConstEnum {
         }
     }
 
+    private buildConstEnumExportedDeclaration(
+        node: ExportSpecifier | Identifier | TSEnumDeclaration,
+        moduleSpecifier: IModuleSpecifier,
+    ): void {
+        const enumName =
+            node.type === "ExportSpecifier"
+                ? node.exported.type === "Identifier"
+                    ? node.exported.name
+                    : node.exported.value
+                : node.type === "Identifier"
+                  ? node.name
+                  : node.id.name;
+
+        if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, enumName)) {
+            return;
+        }
+
+        const localEnumName =
+            node.type === "ExportSpecifier" ? node.local.name : node.type === "Identifier" ? "default" : node.id.name;
+
+        const taskKey = this.getEnumTaskKey(moduleSpecifier, localEnumName);
+        if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, localEnumName)) {
+            this.enumCollection.setExportedEnum(moduleSpecifier, localEnumName, enumName);
+            this.mayBeConstEnumImportSpecifiers.delete(taskKey);
+        } else {
+            this.mayBeConstEnumImportSpecifiers.add(taskKey);
+        }
+    }
+
     private resolveImportedModuleSpecifier(sourceValue: string, moduleSpecifier: IModuleSpecifier): IModuleSpecifier {
         // Remove ts extensions
-        for (const ext of [".ts", ".cts", ".mts", ".tsx"]) {
-            if (sourceValue.endsWith(ext)) {
-                sourceValue = sourceValue.slice(0, -ext.length);
-                break;
-            }
+        if (isTs(getLang(sourceValue))) {
+            sourceValue = path.resolve(
+                path.dirname(sourceValue),
+                path.basename(sourceValue, path.extname(sourceValue)),
+            );
         }
         if (sourceValue.startsWith(".")) {
             // relative path
