@@ -1,8 +1,7 @@
 import path from "path";
+import { ViteInlineConstEnumPlugin } from "unplugin-inline-const-enum/vite";
 import { build, type InlineConfig } from "vite";
 import { describe, expect, it } from "vitest";
-
-import { ViteInlineConstEnumPlugin } from "../src/vite";
 
 describe("E2E - Inline Const Enum Plugin", () => {
     const fixturesDir = path.resolve(__dirname, "fixtures");

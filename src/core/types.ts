@@ -1,4 +1,4 @@
-import type { babelParse } from "ast-kit";
+import type { Program } from "@babel/types";
 import type { FilterPattern } from "unplugin";
 
 export interface IInlineConstEnumOptions {
@@ -63,5 +63,5 @@ export type IModuleMetadata = {
 
 export interface ITsModule {
     moduleSpecifier: IModuleSpecifier;
-    ast: ReturnType<typeof babelParse>;
+    ast: Program;
 }
