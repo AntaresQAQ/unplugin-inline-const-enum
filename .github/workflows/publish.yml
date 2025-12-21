@@ -32,11 +32,11 @@ jobs:
       - name: Run lint
         run: yarn lint
 
-      - name: Run tests
-        run: yarn test
-
       - name: Build package
         run: yarn build
+
+      - name: Run tests
+        run: yarn test
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
