@@ -123,7 +123,7 @@ export class InlineConstEnum {
             this.enumDeclarationDeferredTask.hasWaitingExecutions() ||
             // The to-be-determined list size does not change in the this iteration
             // That means no new const enum declarations, imports or exports are found in this iteration
-            (this.toBeDeterminedSpecifiers.size != prevToBeDeterminedCount && this.toBeDeterminedSpecifiers.size > 0)
+            this.toBeDeterminedSpecifiers.size != prevToBeDeterminedCount
         );
         if (this.options.debug) {
             this.enumCollection.printMapping();
