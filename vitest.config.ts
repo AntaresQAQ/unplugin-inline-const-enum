@@ -4,7 +4,5 @@ export default defineConfig({
     test: {
         include: ["test/**/*.test.ts"],
         globals: true,
-        silent: false,
-        reporters: "verbose",
     },
 });
