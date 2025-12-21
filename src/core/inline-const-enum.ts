@@ -29,7 +29,7 @@ import type {
     IResolvedInlineConstEnumOptions,
     ITsModule,
 } from "./types";
-import { isValidConstEnumMemberValue, makeEnumSpecifier, printLog, removeExtension } from "./utils";
+import { isEqualSet, isValidConstEnumMemberValue, makeEnumSpecifier, printLog, removeExtension } from "./utils";
 
 export class InlineConstEnum {
     private tsConfigMatchPath: tsConfigPaths.MatchPath;
@@ -114,16 +114,16 @@ export class InlineConstEnum {
     }
 
     public scanConstEnums(): void {
-        let prevToBeDeterminedCount: number;
+        let prevToBeDeterminedSpecifiers: Set<string>;
         do {
-            prevToBeDeterminedCount = this.toBeDeterminedSpecifiers.size;
+            prevToBeDeterminedSpecifiers = new Set(this.toBeDeterminedSpecifiers);
             this.buildConstEnumDeclarations();
             this.enumDeclarationDeferredTask.executeAll();
         } while (
             this.enumDeclarationDeferredTask.hasWaitingExecutions() ||
-            // The to-be-determined list size does not change in the this iteration
+            // The to-be-determined list does not change in this iteration
             // That means no new const enum declarations, imports or exports are found in this iteration
-            this.toBeDeterminedSpecifiers.size != prevToBeDeterminedCount
+            !isEqualSet(this.toBeDeterminedSpecifiers, prevToBeDeterminedSpecifiers)
         );
         if (this.options.debug) {
             this.enumCollection.printMapping();
