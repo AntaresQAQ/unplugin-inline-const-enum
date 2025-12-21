@@ -16,6 +16,7 @@ import MagicString from "magic-string";
 import path from "path";
 import tsConfigPaths from "tsconfig-paths";
 
+import { DeferredSyncTask } from "./deferred-task";
 import { EnumCollection } from "./enum-collection";
 import type {
     IConstEnumCommonDeclaration,
@@ -28,15 +29,22 @@ import type {
     IResolvedInlineConstEnumOptions,
     ITsModule,
 } from "./types";
-import { isValidConstEnumMemberValue, printLog } from "./utils";
+import { isValidConstEnumMemberValue, makeEnumSpecifier, printLog, removeExtension } from "./utils";
 
 export class InlineConstEnum {
     private tsConfigMatchPath: tsConfigPaths.MatchPath;
 
-    private tsModules: ITsModule[] = [];
+    private readonly tsModules: ITsModule[] = [];
     private readonly enumCollection: EnumCollection;
-    private readonly enumDeclarationPendingTask = new Map<string, () => void>();
-    private readonly mayBeConstEnumImportSpecifiers = new Set<string>();
+
+    // Some const enum declarations may depend on other const enum declarations
+    // We use a deferred task to handle such cases
+    private readonly enumDeclarationDeferredTask = new DeferredSyncTask();
+
+    // Specifiers of enums that are yet to be determined (imported/exported)
+    // We don't know the specifier is a valid const enum until we find its declaration
+    // When we find its declaration, we remove it from this set
+    private readonly toBeDeterminedSpecifiers = new Set<string>();
 
     constructor(private readonly options: IResolvedInlineConstEnumOptions) {
         this.enumCollection = new EnumCollection(options);
@@ -82,23 +90,22 @@ export class InlineConstEnum {
             cwd: this.options.sourceDir,
         });
 
-        this.tsModules = await Promise.all(
-            files
-                .filter((file) => isTs(getLang(file)))
-                .map<Promise<ITsModule>>(async (file) => {
-                    const fullPath = path.resolve(this.options.sourceDir, file);
+        this.tsModules.push(
+            ...(await Promise.all(
+                files
+                    .filter((file) => isTs(getLang(file)))
+                    .map<Promise<ITsModule>>(async (file) => {
+                        const fullPath = path.resolve(this.options.sourceDir, file);
 
-                    // TS module name is the file path without extension
-                    // because we don't add extension to the import statement in the code
-                    const moduleSpecifier = path.resolve(
-                        path.dirname(fullPath),
-                        path.basename(fullPath, path.extname(fullPath)),
-                    );
-                    return {
-                        moduleSpecifier,
-                        ast: babelParse(await readFile(fullPath, "utf-8"), getLang(file)),
-                    };
-                }),
+                        // TS module name is the file path without extension
+                        // because we don't add extension to the import statement in the code
+                        const moduleSpecifier = removeExtension(fullPath);
+                        return {
+                            moduleSpecifier,
+                            ast: babelParse(await readFile(fullPath, "utf-8"), getLang(file)),
+                        };
+                    }),
+            )),
         );
 
         if (this.options.debug) {
@@ -107,17 +114,17 @@ export class InlineConstEnum {
     }
 
     public scanConstEnums(): void {
-        let prevMayBeConstEnumImportSpecifiersCount = -1;
-        while (
-            this.enumDeclarationPendingTask.size != 0 ||
-            this.mayBeConstEnumImportSpecifiers.size != prevMayBeConstEnumImportSpecifiersCount
-        ) {
-            prevMayBeConstEnumImportSpecifiersCount = this.mayBeConstEnumImportSpecifiers.size;
+        let prevToBeDeterminedCount: number;
+        do {
+            prevToBeDeterminedCount = this.toBeDeterminedSpecifiers.size;
             this.buildConstEnumDeclarations();
-            for (const task of this.enumDeclarationPendingTask.values()) {
-                task();
-            }
-        }
+            this.enumDeclarationDeferredTask.executeAll();
+        } while (
+            this.enumDeclarationDeferredTask.hasWaitingExecutions() ||
+            // The to-be-determined list size does not change in the this iteration
+            // That means no new const enum declarations, imports or exports are found in this iteration
+            (this.toBeDeterminedSpecifiers.size != prevToBeDeterminedCount && this.toBeDeterminedSpecifiers.size > 0)
+        );
         if (this.options.debug) {
             this.enumCollection.printMapping();
         }
@@ -193,7 +200,7 @@ export class InlineConstEnum {
             return;
         }
 
-        const taskKey = this.getEnumTaskKey(moduleSpecifier, enumName);
+        const taskKey = makeEnumSpecifier(moduleSpecifier, enumName);
         const enumDeclaration: IConstEnumCommonDeclaration = {
             definition: new Map(),
         };
@@ -217,9 +224,9 @@ export class InlineConstEnum {
 
                 if (value === null) {
                     // The value is dependent on other unevaluated enum members, postpone the evaluation
-                    this.enumDeclarationPendingTask.set(taskKey, () =>
-                        this.buildConstEnumCommonDeclaration(node, moduleSpecifier),
-                    );
+                    this.enumDeclarationDeferredTask.addTask(taskKey, () => {
+                        this.buildConstEnumCommonDeclaration(node, moduleSpecifier);
+                    });
                     return;
                 }
 
@@ -252,7 +259,6 @@ export class InlineConstEnum {
         }
 
         this.enumCollection.setEnumDeclaration(moduleSpecifier, enumName, enumDeclaration);
-        this.enumDeclarationPendingTask.delete(taskKey);
     }
 
     private buildConstEnumImportedDeclaration(
@@ -275,9 +281,11 @@ export class InlineConstEnum {
                     ? node.imported.name
                     : node.imported.value;
 
-        const taskKey = this.getEnumTaskKey(moduleSpecifier, enumName);
+        const enumSpecifier = makeEnumSpecifier(moduleSpecifier, enumName);
         if (this.enumCollection.hasEnumDeclaration(importedModuleSpecifier, importedEnumName)) {
-            this.mayBeConstEnumImportSpecifiers.delete(taskKey);
+            // The imported enum declaration is found, create the imported declaration
+            // Remove from pending list
+            this.toBeDeterminedSpecifiers.delete(enumSpecifier);
 
             const enumDeclaration: IConstEnumImportedDeclaration = {
                 from: importedModuleSpecifier,
@@ -286,7 +294,9 @@ export class InlineConstEnum {
 
             this.enumCollection.setEnumDeclaration(moduleSpecifier, enumName, enumDeclaration);
         } else {
-            this.mayBeConstEnumImportSpecifiers.add(taskKey);
+            // The imported enum declaration is not found yet, we don't know if it is a valid const enum import.
+            // Add to pending list for the next scan iteration.
+            this.toBeDeterminedSpecifiers.add(enumSpecifier);
         }
     }
 
@@ -310,19 +320,24 @@ export class InlineConstEnum {
         const localEnumName =
             node.type === "ExportSpecifier" ? node.local.name : node.type === "Identifier" ? "default" : node.id.name;
 
-        const taskKey = this.getEnumTaskKey(moduleSpecifier, localEnumName);
+        const enumSpecifier = makeEnumSpecifier(moduleSpecifier, localEnumName);
         if (this.enumCollection.hasEnumDeclaration(moduleSpecifier, localEnumName)) {
+            // The local enum declaration is found, create the exported declaration
+            // Remove from pending list
+            this.toBeDeterminedSpecifiers.delete(enumSpecifier);
+
             this.enumCollection.setExportedEnum(moduleSpecifier, localEnumName, enumName);
-            this.mayBeConstEnumImportSpecifiers.delete(taskKey);
         } else {
-            this.mayBeConstEnumImportSpecifiers.add(taskKey);
+            // The local enum declaration is not found yet, we don't know if it is a valid const enum to export.
+            // Add to pending list for the next scan iteration.
+            this.toBeDeterminedSpecifiers.add(enumSpecifier);
         }
     }
 
     private resolveImportedModuleSpecifier(sourceValue: string, moduleSpecifier: IModuleSpecifier): IModuleSpecifier {
         // Remove ts extensions
         if (isTs(getLang(sourceValue))) {
-            sourceValue = path.join(path.dirname(sourceValue), path.basename(sourceValue, path.extname(sourceValue)));
+            sourceValue = removeExtension(sourceValue);
         }
         if (sourceValue.startsWith(".")) {
             // relative path
@@ -354,7 +369,7 @@ export class InlineConstEnum {
         if (node.type === "NumericLiteral" || node.type === "StringLiteral") {
             // 1, "1"
             return node.value;
-        } else if (node.type === "UnaryExpression" && ["-", "+", "~"].includes(node.operator)) {
+        } else if (node.type === "UnaryExpression") {
             // -1, +1, ~1
             const value = this.evaluateExpression(node.argument, moduleSpecifier, enumName, memberName, definition);
             if (value === null) {
@@ -363,6 +378,7 @@ export class InlineConstEnum {
 
             return this.evaluateConstExpression(`${node.operator} ${JSON.stringify(value)}`);
         } else if (node.type === "BinaryExpression") {
+            // 1 + 2, SomeEnum.SomeMember + 1, etc.
             return this.evaluateBinaryExpression(node, moduleSpecifier, enumName, memberName, definition);
         } else if (
             node.type === "MemberExpression" &&
@@ -392,6 +408,9 @@ export class InlineConstEnum {
             const value = definition.get(node.name);
 
             if (value === undefined) {
+                // SomeMember is not found in the current enum definition, but it may be a global const variable
+                // We don't support global const variable for now
+                // TODO: Support global const variable
                 throw new TypeError(
                     `Const enum member "${enumName}.${memberName}" in module ${moduleSpecifier} has unsupported type.`,
                 );
@@ -428,9 +447,5 @@ export class InlineConstEnum {
 
     private evaluateConstExpression(express: string): IConstEnumMemberValue {
         return new Function(`return ${express}`)();
-    }
-
-    private getEnumTaskKey(moduleSpecifier: IModuleSpecifier, enumName: IConstEnumName): string {
-        return `${moduleSpecifier}::${enumName}`;
     }
 }

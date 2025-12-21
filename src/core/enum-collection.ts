@@ -7,7 +7,7 @@ import type {
     IModuleSpecifier,
     IResolvedInlineConstEnumOptions,
 } from "./types";
-import { printLog } from "./utils";
+import { makeEnumMemberSpecifier, printLog } from "./utils";
 
 export class EnumCollection {
     private moduleMap: Map<IModuleSpecifier, IModuleMetadata> = new Map();
@@ -69,7 +69,7 @@ export class EnumCollection {
         enumName: IConstEnumName | "default",
         memberName: IConstEnumMemberName,
     ): IConstEnumMemberValue | null {
-        const cacheKey = `${moduleSpecifier}::${enumName}::${memberName}`;
+        const cacheKey = makeEnumMemberSpecifier(moduleSpecifier, enumName, memberName);
         let resultValue: IConstEnumMemberValue | null = this.cache.get(cacheKey) ?? null;
         if (resultValue) {
             return resultValue;

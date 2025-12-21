@@ -1,4 +1,6 @@
-import type { IConstEnumMemberValue } from "./types";
+import * as path from "path";
+
+import type { IConstEnumMemberValue, IConstEnumName, IModuleSpecifier } from "./types";
 
 export function printLog(message: string): void {
     console.log(`[uplugin-inline-const-enum] ${message}`.replaceAll(process.cwd(), "."));
@@ -6,4 +8,20 @@ export function printLog(message: string): void {
 
 export function isValidConstEnumMemberValue(value: unknown): value is IConstEnumMemberValue {
     return typeof value === "number" || typeof value === "string";
+}
+
+export function removeExtension(filePath: string): string {
+    return path.join(path.dirname(filePath), path.basename(filePath, path.extname(filePath)));
+}
+
+export function makeEnumSpecifier(moduleSpecifier: IModuleSpecifier, enumName: IConstEnumName): string {
+    return `${moduleSpecifier}::${enumName}`;
+}
+
+export function makeEnumMemberSpecifier(
+    moduleSpecifier: IModuleSpecifier,
+    enumName: IConstEnumName,
+    memberName: IConstEnumMemberValue,
+): string {
+    return `${moduleSpecifier}::${enumName}::${memberName}`;
 }

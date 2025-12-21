@@ -1,20 +1,26 @@
 import path from "path";
-import { ViteInlineConstEnumPlugin } from "unplugin-inline-const-enum/vite";
+import type ViteInlineConstEnumPlugin from "unplugin-inline-const-enum/vite";
 import { build, type InlineConfig } from "vite";
+import tsconfigPaths from "vite-tsconfig-paths";
 import { describe, expect, it } from "vitest";
 
 describe("E2E - Inline Const Enum Plugin", () => {
-    const fixturesDir = path.resolve(__dirname, "fixtures");
-    const tsConfigPath = path.resolve(fixturesDir, "tsconfig.json");
+    const sourceDir = path.resolve(__dirname, "fixtures");
+    const tsConfig = path.resolve(sourceDir, "tsconfig.json");
+    const entry = path.resolve(sourceDir, "app.ts");
 
-    async function buildWithPluginAsync(entry: string, sourceDir: string, tsConfig: string) {
+    async function buildWithPluginAsync(plugin: typeof ViteInlineConstEnumPlugin) {
         const config: InlineConfig = {
             root: path.dirname(entry),
             plugins: [
-                ViteInlineConstEnumPlugin({
+                plugin({
                     sourceDir,
                     sourcePattern: "**/*.ts",
                     tsConfig,
+                    debug: true,
+                }),
+                tsconfigPaths({
+                    projects: [tsConfig],
                 }),
             ],
             build: {
@@ -36,9 +42,17 @@ describe("E2E - Inline Const Enum Plugin", () => {
         return { ...result, output: [] };
     }
 
-    it("should inline const enums correctly", async () => {
-        const entry = path.resolve(fixturesDir, "app.ts");
-        const result = await buildWithPluginAsync(entry, fixturesDir, tsConfigPath);
+    it("should inline const enums correctly - dev", async () => {
+        const { ViteInlineConstEnumPlugin } = await import("../src/vite");
+        const result = await buildWithPluginAsync(ViteInlineConstEnumPlugin);
+        expect(result).toBeDefined();
+        expect(result.output).toHaveLength(1);
+        expect(result.output[0].code).toMatchSnapshot();
+    });
+
+    it("should inline const enums correctly - prod", async () => {
+        const { ViteInlineConstEnumPlugin } = await import("unplugin-inline-const-enum/vite");
+        const result = await buildWithPluginAsync(ViteInlineConstEnumPlugin);
         expect(result).toBeDefined();
         expect(result.output).toHaveLength(1);
         expect(result.output[0].code).toMatchSnapshot();
