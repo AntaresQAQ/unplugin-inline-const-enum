@@ -4,4 +4,6 @@ export default defineConfig({
     entry: "./src/*.ts",
     exports: true,
     inlineOnly: [],
+    dts: true,
+    minify: true,
 });

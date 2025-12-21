@@ -1,0 +1,185 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`E2E - Inline Const Enum Plugin > should inline const enums correctly - dev 1`] = `
+"const enumValues = {
+  NoInitializer: {
+    No: 0,
+    Yes: 1
+  },
+  Initializer: {
+    Red: 0,
+    Green: 5,
+    Blue: 6
+  },
+  StringInitializer: {
+    Up: "UP",
+    Down: "DOWN",
+    Left: "LEFT",
+    Right: "RIGHT"
+  },
+  MixedInitializer: {
+    A: 0,
+    B: 2,
+    C: 3,
+    D: "Delta",
+    E: "Echo",
+    F: "Foxtrot",
+    G: 10,
+    H: 11,
+    I: 12,
+    J: 0,
+    K: "Delta"
+  },
+  DepInitializer: {
+    X: 5,
+    Y: 6,
+    Z: 1
+  }
+};
+function getEnumValues() {
+  return {
+    ExportDep1: {
+      A: 1,
+      B: 2,
+      C: 3,
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep1Alias: {
+      A: 1,
+      B: 2,
+      C: 3,
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias1: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias2: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    }
+  };
+}
+function duplicateUsage() {
+  const a = 1;
+  const b = 5;
+  const c = "LEFT";
+  const d = "Foxtrot";
+  const e = 6;
+  return [a, b, c, d, e];
+}
+export {
+  duplicateUsage,
+  enumValues,
+  getEnumValues
+};
+"
+`;
+
+exports[`E2E - Inline Const Enum Plugin > should inline const enums correctly - prod 1`] = `
+"const enumValues = {
+  NoInitializer: {
+    No: 0,
+    Yes: 1
+  },
+  Initializer: {
+    Red: 0,
+    Green: 5,
+    Blue: 6
+  },
+  StringInitializer: {
+    Up: "UP",
+    Down: "DOWN",
+    Left: "LEFT",
+    Right: "RIGHT"
+  },
+  MixedInitializer: {
+    A: 0,
+    B: 2,
+    C: 3,
+    D: "Delta",
+    E: "Echo",
+    F: "Foxtrot",
+    G: 10,
+    H: 11,
+    I: 12,
+    J: 0,
+    K: "Delta"
+  },
+  DepInitializer: {
+    X: 5,
+    Y: 6,
+    Z: 1
+  }
+};
+function getEnumValues() {
+  return {
+    ExportDep1: {
+      A: 1,
+      B: 2,
+      C: 3,
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep1Alias: {
+      A: 1,
+      B: 2,
+      C: 3,
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias1: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    },
+    ExportDep2Alias2: {
+      X: 10,
+      Y: 20,
+      Z: 30
+    }
+  };
+}
+function duplicateUsage() {
+  const a = 1;
+  const b = 5;
+  const c = "LEFT";
+  const d = "Foxtrot";
+  const e = 6;
+  return [a, b, c, d, e];
+}
+export {
+  duplicateUsage,
+  enumValues,
+  getEnumValues
+};
+"
+`;
