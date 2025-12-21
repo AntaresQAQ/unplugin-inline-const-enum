@@ -17,7 +17,7 @@ describe("E2E - Inline Const Enum Plugin", () => {
                     sourceDir,
                     sourcePattern: "**/*.ts",
                     tsConfig,
-                    debug: true,
+                    debug: false,
                 }),
                 tsconfigPaths({
                     projects: [tsConfig],
