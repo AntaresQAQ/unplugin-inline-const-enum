@@ -258,6 +258,47 @@ console.log(HttpStatus.OK); // → 200
 
 2. **Const Enum Definitions Not Removed**: The plugin only inlines const enum values but does not remove the const enum definitions from the output. To eliminate unused const enum declarations, you should rely on tree-shaking tools (like Rollup or Webpack with `mode: 'production'`) to remove the dead code.
 
+3. **Namespace Import/Export Not Supported**: The plugin cannot inline const enums when they are accessed through namespace imports or re-exported through namespace exports.
+
+    **Not supported - Namespace import:**
+
+    ```typescript
+    // a.ts
+    export const enum CE_Test {
+        X = 1,
+        Y = 2,
+    }
+
+    // b.ts
+    import * as A from "./a";
+    const X = A.CE_Test.X; // ❌ Won't be inlined
+    ```
+
+    **Not supported - Namespace export/import:**
+
+    ```typescript
+    // a.ts
+    export const enum CE_Test {
+        X = 1,
+        Y = 2,
+    }
+
+    // b.ts
+    export * from "./a";
+
+    // c.ts
+    import { CE_Test } from "./b";
+    const X = CE_Test.X; // ❌ Won't be inlined, CE_Test is exported by namespace
+    ```
+
+    **Workaround**: Use named imports instead:
+
+    ```typescript
+    // b.ts
+    import { CE_Test } from "./a";
+    const X = CE_Test.X; // ✅ Will be inlined
+    ```
+
 ## 🧪 Testing
 
 ```bash
